@@ -1,71 +1,45 @@
-var fs = require('fs');
+const fs = require('fs');
+const path = require('path');
 
-var regex = new RegExp('([\\w.]+)|\\/([\\w.]+)');
-var blocksCode = [];
-var blocksPosition = [];
-var indexCode = [];
+var regex = '\\[\\%([\\w\\s\\/\\\\\.\\:]+)\\%\\]';
 
-function writeCodeInFile(dataForWrite) {
-    let stream = fs.createWriteStream('result.html');
-    
-    stream.once('open', function(fd) {
-        dataForWrite.forEach((line) => stream.write(line + "\n"));
-        stream.end();
-    });
+function build(file) {
+	let filesCode = [];
+
+	if (!fs.existsSync(path.join(__dirname, '/index.html')))
+		return;
+
+	let data = fs.readFileSync(path.join(__dirname, '/index.html'), 'utf-8')
+	let code = Array.from(data.matchAll(regex));
+
+	for (let i = 0; i < code.length; i++) {
+		code[i][1] = code[i][1].trim();
+
+		if (!fs.existsSync(code[i][1])) {
+			console.log(`WARN > ${code[i][1]} not exists`);
+			continue;
+		}
+		
+		filesCode.push(fs.readFileSync(code[i][1], 'utf-8'));
+	}
+
+	for (let i = 0; i < code.length; i++) {
+		if (!filesCode[i])
+			continue;
+
+		data = data.replace(code[i][0], filesCode[i]);
+	}
+
+	if (!fs.existsSync(path.join(__dirname, '/result')))
+		fs.mkdir(path.join(__dirname, '/result'), err => {
+			if (err) {
+				console.log(`ERROR > ${err.message}`);
+				return;
+			}
+		});
+
+	let fd = fs.openSync(path.join('result/', file.match('([\\w]+.html)')[1]), 'w');
+	fs.writeSync(fd, data);
 }
 
-function writeBlockCodeInArray() {
-    let dataForWrite = [];
-    
-    indexCode.forEach((line) => {
-        if (!line.trim().startsWith('[%') && !line.trim().endsWith('%]')) {
-            if (blocksPosition.includes(dataForWrite.length))
-                for (let i = 0; i < blocksPosition.length; i++)
-                    blocksCode[i].forEach((line_) => dataForWrite.push('\t\t' + line_));
-            else
-                dataForWrite.push(line);
-        }
-    });
-    
-    writeCodeInFile(dataForWrite);
-}
-
-function readBlockCode(path, position) {
-    let data = fs.readFileSync(path).toString().split('\n');
-    let code = [];
-    
-    data.forEach((line) => code.push(line));
-    
-    blocksCode.push(code);
-    blocksPosition.push(position);
-}
-
-function readIndexFile(path) {
-    let data = fs.readFileSync(path).toString().split('\n');
-    let position = 0;
-    
-    data.forEach((line) => indexCode.push(line));
-    
-    data.forEach((line) => {
-        if (line.trim().startsWith('[%') && line.trim().endsWith('%]'))
-            readBlockCode(line.trim().match(regex)[0], position);
-        else
-            position++;
-    });
-}
-
-function main() {
-    try {
-        if (fs.existsSync('index.html'))
-            readIndexFile('index.html');
-        else
-            console.log('File not found');
-        
-        if (blocksCode.length > 0 && blocksPosition.length > 0)
-            writeBlockCodeInArray();
-    } catch(err) {
-        console.log(err);
-    }
-}
-
-main();
+build(path.join(__dirname, '/index.html'));
