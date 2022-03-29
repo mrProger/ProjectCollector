@@ -2,14 +2,17 @@ const fs = require('fs');
 const path = require('path');
 
 var regex = '\\[\\%([\\w\\s\\/\\\\\.\\:]+)\\%\\]';
+var fileNameRegex = '([\\w]+.html)';
+var filesList = [];
+var filesNameList = [];
 
-function build(file) {
+function build(file, filename) {
 	let filesCode = [];
 
-	if (!fs.existsSync(path.join(__dirname, '/index.html')))
+	if (!fs.existsSync(file))
 		return;
 
-	let data = fs.readFileSync(path.join(__dirname, '/index.html'), 'utf-8')
+	let data = fs.readFileSync(file, 'utf-8')
 	let code = Array.from(data.matchAll(regex));
 
 	for (let i = 0; i < code.length; i++) {
@@ -38,8 +41,28 @@ function build(file) {
 			}
 		});
 
-	let fd = fs.openSync(path.join('result/', file.match('([\\w]+.html)')[1]), 'w');
+	let fd = fs.openSync(path.join('result/', filename), 'w');
 	fs.writeSync(fd, data);
 }
 
-build(path.join(__dirname, '/index.html'));
+function getAllHtmlFiles() {
+	if (!fs.existsSync(path.join(__dirname, '/pages')))
+		return;
+	
+	fs.readdirSync(path.join(__dirname, '/pages')).forEach(file => {
+		if (file.endsWith('.html'))
+			filesList.push(path.join(__dirname, '/pages/', file));
+	});
+}
+
+const getHtmlFilesName = path => 
+	path.match(fileNameRegex)[1];
+
+getAllHtmlFiles();
+
+filesList.forEach(file => 
+	filesNameList.push(getHtmlFilesName(file))
+);
+
+for (let i = 0; i < filesList.length; i++)
+	build(filesList[i], filesNameList[i]);
